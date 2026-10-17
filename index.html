@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>貓人團拆 Catter Break - 團拆價格與降價追蹤 Dashboard</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --accent-green: #10b981;
+            --accent-blue: #3b82f6;
+            --accent-gold: #f59e0b;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --border-color: #334155;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.5;
+            padding: 20px;
+        }
+        .container { max-width: 1280px; margin: 0 auto; }
+        header {
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        h1 { font-size: 1.5rem; font-weight: 700; color: #fff; }
+        .update-time { font-size: 0.85rem; color: var(--text-secondary); }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 28px;
+        }
+        .metric-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+        }
+        .metric-label { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 4px; }
+        .metric-value { font-size: 1.6rem; font-weight: 700; color: var(--accent-green); }
+        .metric-value.blue { color: var(--accent-blue); }
+        .metric-value.gold { color: var(--accent-gold); }
+        .section-title { font-size: 1.2rem; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 28px;
+            overflow-x: auto;
+        }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
+        th, td { padding: 12px; border-bottom: 1px solid var(--border-color); }
+        th { color: var(--text-secondary); font-weight: 600; background: rgba(0,0,0,0.2); }
+        tr:hover { background: rgba(255,255,255,0.02); }
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .badge-drop { background: rgba(16, 185, 129, 0.15); color: var(--accent-green); border: 1px solid var(--accent-green); }
+        .badge-no { background: rgba(59, 130, 246, 0.15); color: var(--accent-blue); }
+        .badge-play { background: rgba(245, 158, 11, 0.15); color: var(--accent-gold); }
+        .badge-err { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid #ef4444; }
+        .btn {
+            background: var(--accent-blue);
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+        .btn:hover { opacity: 0.9; }
+        .filters { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+        .filters input, .filters select {
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.75);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+        .modal {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            width: 100%;
+            max-width: 900px;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 24px;
+            position: relative;
+        }
+        .close-btn {
+            position: absolute;
+            top: 16px; right: 16px;
+            background: none; border: none;
+            color: var(--text-secondary);
+            font-size: 1.5rem; cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div>
+                <h1>貓人團拆 Catter Break - 團拆價格與降價追蹤</h1>
+                <div class="update-time" id="last-updated">更新時間：載入中...</div>
+            </div>
+        </header>
+
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-label">今日發現降價位置</div>
+                <div class="metric-value" id="metric-today-drops">0</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">近 7 天累計降價位置</div>
+                <div class="metric-value blue" id="metric-seven-drops">0</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">最近一次降價發現時間</div>
+                <div style="font-size:0.95rem; font-weight:600; color:#fff;" id="metric-last-drop-time">-</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">追蹤中團拆商品總數</div>
+                <div class="metric-value gold" id="metric-total-products">0</div>
+            </div>
+        </div>
+
+        <div class="section-title">📉 最近位置降價動態 Top 10</div>
+        <div class="card">
+            <table>
+                <thead>
+                    <tr>
+                        <th>商品名稱 (團號)</th>
+                        <th>位置名稱</th>
+                        <th>首次觀測價</th>
+                        <th>降價前</th>
+                        <th>降價後</th>
+                        <th>省下金額</th>
+                        <th>時間</th>
+                    </tr>
+                </thead>
+                <tbody id="drops-body">
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section-title">📦 全部團拆商品總覽</div>
+        <div class="card">
+            <div class="filters">
+                <input type="text" id="search-input" placeholder="搜尋商品名稱或團號..." oninput="filterProducts()">
+                <select id="play-filter" onchange="filterProducts()">
+                    <option value="">全部玩法</option>
+                    <option value="PYP">PYP</option>
+                    <option value="PYG">PYG（買女孩）</option>
+                    <option value="PYT">PYT</option>
+                    <option value="Random">Random</option>
+                    <option value="Filler">Filler</option>
+                </select>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>商品名稱</th>
+                        <th>團號</th>
+                        <th>玩法</th>
+                        <th>位置數</th>
+                        <th>首次觀測價總額</th>
+                        <th>最新價格總額 / 追蹤狀態</th>
+                        <th>首次發現時間</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="products-body">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="product-modal">
+        <div class="modal">
+            <button class="close-btn" onclick="closeModal()">&times;</button>
+            <h2 id="modal-title" style="margin-bottom:12px; font-size:1.3rem;"></h2>
+            <div id="modal-meta" style="display:flex; gap:16px; flex-wrap:wrap; margin-bottom:20px; font-size:0.9rem; color:var(--text-secondary);"></div>
+
+            <div class="filters">
+                <input type="text" id="modal-pos-search" placeholder="搜尋位置..." oninput="renderModalPositions()">
+                <select id="modal-sort" onchange="renderModalPositions()">
+                    <option value="">預設排序</option>
+                    <option value="drop_amount_desc">依降價金額：高到低</option>
+                    <option value="drop_percent_desc">依降價百分比：高到低</option>
+                    <option value="drop_time_desc">依最近降價時間排序</option>
+                    <option value="price_desc">最新價格：高到低</option>
+                    <option value="price_asc">最新價格：低到高</option>
+                </select>
+                <label style="font-size:0.9rem; cursor:pointer; display:flex; align-items:center; gap:6px;">
+                    <input type="checkbox" id="modal-only-drops" onchange="renderModalPositions()"> 只看有降價的位置
+                </label>
+            </div>
+
+            <div style="overflow-x: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>原始位置名稱</th>
+                            <th>分類</th>
+                            <th>首次觀測價</th>
+                            <th>目前最新價格</th>
+                            <th>累計降價優惠</th>
+                            <th>最近降價時間</th>
+                        </tr>
+                    </thead>
+                    <tbody id="modal-pos-body">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let SITE_DATA = null;
+        let currentModalProduct = null;
+
+        async function init() {
+            try {
+                const resp = await fetch('./data.json');
+                SITE_DATA = await resp.json();
+                
+                const m = SITE_DATA.metrics || {};
+                document.getElementById('last-updated').innerText = '更新時間：' + (m.last_updated_time || '-');
+                document.getElementById('metric-today-drops').innerText = m.today_drop_count || 0;
+                document.getElementById('metric-seven-drops').innerText = m.seven_days_drop_count || 0;
+                document.getElementById('metric-last-drop-time').innerText = m.last_drop_time || '-';
+                document.getElementById('metric-total-products').innerText = m.total_products_count || 0;
+
+                renderRecentDrops();
+                renderProducts();
+            } catch (e) {
+                console.error("Failed to load data.json", e);
+            }
+        }
+
+        function renderRecentDrops() {
+            const tbody = document.getElementById('drops-body');
+            const drops = SITE_DATA.price_drop_events || [];
+            if (drops.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-secondary);">目前尚無降價紀錄</td></tr>';
+                return;
+            }
+            const sorted = [...drops].sort((a,b) => (b.discovered_timestamp || '').localeCompare(a.discovered_timestamp || '')).slice(0, 10);
+            tbody.innerHTML = sorted.map(e => `
+                <tr>
+                    <td><b>${e.product_name} (${e.break_number})</b></td>
+                    <td><b>${e.position_original_name}</b></td>
+                    <td>NT$ ${(e.opening_price || 0).toLocaleString()}</td>
+                    <td>NT$ ${(e.previous_price || 0).toLocaleString()}</td>
+                    <td><b style="color:var(--accent-green);">NT$ ${(e.new_price || 0).toLocaleString()}</b></td>
+                    <td><span class="badge badge-drop">省 NT$ ${(e.drop_amount || 0).toLocaleString()} (${((e.drop_percent||0)*100).toFixed(1)}%)</span></td>
+                    <td>${e.discovered_timestamp}</td>
+                </tr>
+            `).join('');
+        }
+
+        function renderProducts() {
+            const tbody = document.getElementById('products-body');
+            const kw = document.getElementById('search-input').value.trim().toLowerCase();
+            const playFilter = document.getElementById('play-filter').value;
+
+            const filtered = (SITE_DATA.products || []).filter(p => {
+                if (playFilter && p.play_type !== playFilter) return false;
+                if (kw && !p.product_name.toLowerCase().includes(kw) && !p.break_number.toLowerCase().includes(kw)) return false;
+                return true;
+            });
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color:var(--text-secondary);">尚無符合條件的團拆商品</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(p => {
+                let opSumText = "";
+                let ltSumText = "";
+                let posCountText = "";
+
+                if (p.is_filler || (p.positions && p.positions.length === 0)) {
+                    posCountText = '<span class="badge badge-play">FILLER 單一格售</span>';
+                    if (p.scrape_status === 'error') {
+                        opSumText = '<span class="badge badge-err">價格抓取異常</span>';
+                        ltSumText = '<span class="badge badge-err">價格抓取異常</span>';
+                    } else if (p.filler_data) {
+                        const fd = p.filler_data;
+                        const unitPVal = (fd.current_unit_price != null) ? fd.current_unit_price : null;
+                        opSumText = unitPVal != null ? `NT$ ${unitPVal.toLocaleString()}/格` : '<span style="color:var(--text-secondary);">單價未知</span>';
+
+                        if (fd.sales_observation_status === 'unknown_before_tracking') {
+                            const exactSales = (fd.cumulative_observed_exact_sales != null) ? fd.cumulative_observed_exact_sales : null;
+                            const exactText = exactSales != null ? ` (開始追蹤後精確觀察銷售額: NT$ ${exactSales.toLocaleString()})` : '';
+                            ltSumText = `<b style="color:var(--accent-gold);">單價 NT$ ${unitPVal != null ? unitPVal : '未知'} (追蹤前歷史銷售額未知${exactText})</b>`;
+                        } else if (fd.sales_observation_status === 'tracking_started_at_zero') {
+                            ltSumText = `<b style="color:var(--text-secondary);">單價 NT$ ${unitPVal != null ? unitPVal : '未知'} (追蹤初始為0)</b>`;
+                        } else {
+                            const sold = (fd.cumulative_observed_sold != null) ? fd.cumulative_observed_sold : 0;
+                            const exactSales = (fd.cumulative_observed_exact_sales != null) ? fd.cumulative_observed_exact_sales : 0;
+                            ltSumText = `<b style="color:var(--accent-green);">已賣出 ${sold} 格 (NT$ ${exactSales.toLocaleString()})</b>`;
+                        }
+                    } else {
+                        opSumText = '<span style="color:var(--text-secondary);">暫無資料</span>';
+                        ltSumText = '<span style="color:var(--text-secondary);">暫無資料</span>';
+                    }
+                } else {
+                    const multiplier = p.unit_pricing ? (p.total_positions || 0) : 1;
+                    const opSum = multiplier * p.positions.reduce((acc, pos) => acc + (pos.opening_price || 0), 0);
+                    const ltSum = multiplier * p.positions.reduce((acc, pos) => acc + (pos.latest_price || pos.opening_price || 0), 0);
+                    posCountText = p.total_positions == null ? "位置數待確認" : `${p.total_positions} 個位置`;
+                    if (p.unit_pricing) {
+                        const stock = p.positions[0]?.remaining_quantity;
+                        posCountText += stock == null ? "" : `<br><small>目前剩餘 ${stock} 個</small>`;
+                    }
+                    opSumText = opSum > 0 ? `NT$ ${opSum.toLocaleString()}` : '<span style="color:var(--text-secondary);">暫無資料</span>';
+                    ltSumText = ltSum > 0 ? `<b style="color:var(--accent-green);">NT$ ${ltSum.toLocaleString()}</b>` : '<span style="color:var(--text-secondary);">暫無資料</span>';
+                }
+
+                const hasDrop = (p.positions || []).some(pos => (pos.latest_price || pos.opening_price || 0) < (pos.opening_price || 0));
+                const dropBadge = hasDrop ? '<span class="badge badge-drop">🟢 包含降價位置</span>' : '';
+
+                return `
+                    <tr>
+                        <td><code>${p.product_id}</code></td>
+                        <td><b>${p.product_name}</b> ${dropBadge}</td>
+                        <td><span class="badge badge-no">${p.break_number}</span></td>
+                        <td><span class="badge badge-play">${p.play_type}</span></td>
+                        <td>${posCountText}</td>
+                        <td>${opSumText}</td>
+                        <td>${ltSumText}</td>
+                        <td>${p.first_discovered_time}</td>
+                        <td><button class="btn" onclick="openModal('${p.product_id}')">檢視詳情</button></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function filterProducts() { renderProducts(); }
+
+        function openModal(productId) {
+            currentModalProduct = (SITE_DATA.products || []).find(p => p.product_id === productId);
+            if (!currentModalProduct) return;
+
+            document.getElementById('modal-title').innerText = currentModalProduct.product_name;
+
+            if (currentModalProduct.is_filler || (currentModalProduct.positions && currentModalProduct.positions.length === 0)) {
+                const fd = currentModalProduct.filler_data || {};
+                const unitPVal = (fd.current_unit_price != null) ? fd.current_unit_price : null;
+                const unitPText = unitPVal != null ? `NT$ ${unitPVal.toLocaleString()}` : '未知';
+                const remQtyText = (fd.remaining_quantity != null) ? `${fd.remaining_quantity} 格` : '未知';
+
+                let statusTxt = '正常追蹤中';
+                if (fd.sales_observation_status === 'unknown_before_tracking') {
+                    statusTxt = '追蹤前歷史銷售額未知 (目前售完)';
+                } else if (fd.sales_observation_status === 'tracking_started_at_zero') {
+                    statusTxt = '追蹤時初始庫存為 0';
+                }
+
+                let exactSalesTxt = '未知';
+                if (fd.cumulative_observed_exact_sales != null) {
+                    exactSalesTxt = `NT$ ${fd.cumulative_observed_exact_sales.toLocaleString()}`;
+                    if (fd.sales_observation_status === 'unknown_before_tracking') {
+                        exactSalesTxt += ' (開始追蹤後精確觀察銷售額)';
+                    }
+                }
+
+                const minUncertain = (fd.cumulative_uncertain_sales_min != null) ? fd.cumulative_uncertain_sales_min : null;
+                const maxUncertain = (fd.cumulative_uncertain_sales_max != null) ? fd.cumulative_uncertain_sales_max : null;
+
+                let uncertainRangeTxt = '無';
+                if (minUncertain != null && maxUncertain != null) {
+                    uncertainRangeTxt = `NT$ ${minUncertain.toLocaleString()} ~ NT$ ${maxUncertain.toLocaleString()}`;
+                } else if (minUncertain != null) {
+                    uncertainRangeTxt = `NT$ ${minUncertain.toLocaleString()}`;
+                } else if (maxUncertain != null) {
+                    uncertainRangeTxt = `NT$ ${maxUncertain.toLocaleString()}`;
+                }
+
+                document.getElementById('modal-meta').innerHTML = `
+                    <div>團號：<b style="color:white;">${currentModalProduct.break_number || '-'}</b></div>
+                    <div>玩法：<b style="color:white;">${currentModalProduct.play_type || '-'} (FILLER)</b></div>
+                    <div>單格售價：<b style="color:white;">${unitPText}</b></div>
+                    <div>庫存狀態：<b style="color:var(--accent-gold);">${statusTxt}</b></div>
+                    <div>精確觀察銷售額：<b style="color:var(--accent-green);">${exactSalesTxt}</b></div>
+                    <div>不確定銷售額區間：<b style="color:var(--accent-blue);">${uncertainRangeTxt}</b></div>
+                    <div><a href="${currentModalProduct.product_url}" target="_blank" style="color:var(--accent-blue); text-decoration:none;">前往官網 ↗</a></div>
+                `;
+                document.getElementById('modal-pos-body').innerHTML = `
+                    <tr>
+                        <td colspan="7" style="text-align:center; padding: 20px; color: var(--text-secondary);">
+                            此為 FILLER 單一格售商品，無多選項位置清單。單格價格 ${unitPText}，當前庫存 ${remQtyText}。
+                        </td>
+                    </tr>
+                `;
+            } else {
+                const multiplier = currentModalProduct.unit_pricing ? (currentModalProduct.total_positions || 0) : 1;
+                const opSum = multiplier * currentModalProduct.positions.reduce((acc, pos) => acc + (pos.opening_price || 0), 0);
+                const ltSum = multiplier * currentModalProduct.positions.reduce((acc, pos) => acc + (pos.latest_price || pos.opening_price || 0), 0);
+
+                document.getElementById('modal-meta').innerHTML = `
+                    <div>團號：<b style="color:white;">${currentModalProduct.break_number}</b></div>
+                    <div>玩法：<b style="color:white;">${currentModalProduct.play_type}</b></div>
+                    <div>首次觀測總額（全團）：<b style="color:white;">NT$ ${opSum > 0 ? opSum.toLocaleString() : '待確認'}</b></div>
+                    <div>最新價格總額（全團）：<b style="color:var(--accent-green);">NT$ ${ltSum > 0 ? ltSum.toLocaleString() : '待確認'}</b></div>
+                    <div><a href="${currentModalProduct.product_url}" target="_blank" style="color:var(--accent-blue); text-decoration:none;">前往官網 ↗</a></div>
+                `;
+
+                document.getElementById('modal-pos-search').value = '';
+                document.getElementById('modal-sort').value = '';
+                document.getElementById('modal-only-drops').checked = false;
+
+                renderModalPositions();
+            }
+
+            document.getElementById('product-modal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('product-modal').style.display = 'none';
+        }
+
+        function renderModalPositions() {
+            if (!currentModalProduct || !currentModalProduct.positions) return;
+            const tbody = document.getElementById('modal-pos-body');
+            const kw = document.getElementById('modal-pos-search').value.trim().toLowerCase();
+            const sort = document.getElementById('modal-sort').value;
+            const onlyDrops = document.getElementById('modal-only-drops').checked;
+
+            let list = currentModalProduct.positions.map((pos, i) => {
+                const op = pos.opening_price || 0;
+                const lt = pos.latest_price || op;
+                const dropAmt = op > lt ? (op - lt) : 0;
+                const dropPct = op > 0 && dropAmt > 0 ? (dropAmt / op) : 0;
+                return { ...pos, idx: i + 1, op, lt, dropAmt, dropPct, hasDrop: dropAmt > 0 };
+            });
+
+            if (onlyDrops) list = list.filter(p => p.hasDrop);
+            if (kw) list = list.filter(p => p.original_name.toLowerCase().includes(kw));
+
+            if (sort === 'drop_amount_desc') list.sort((a,b) => b.dropAmt - a.dropAmt);
+            else if (sort === 'drop_percent_desc') list.sort((a,b) => b.dropPct - a.dropPct);
+            else if (sort === 'drop_time_desc') list.sort((a,b) => (b.last_price_change_time || '').localeCompare(a.last_price_change_time || ''));
+            else if (sort === 'price_desc') list.sort((a,b) => b.lt - a.lt);
+            else if (sort === 'price_asc') list.sort((a,b) => a.lt - b.lt);
+
+            if (list.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-secondary);">無符合條件的位置</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = list.map(p => `
+                <tr>
+                    <td>${p.idx}</td>
+                    <td><b>${p.original_name}</b> ${p.hasDrop ? '<span class="badge badge-drop">🟢 降價</span>' : ''}</td>
+                    <td><span class="badge badge-play">${p.category}</span></td>
+                    <td>NT$ ${p.op.toLocaleString()}</td>
+                    <td><b style="color:var(--accent-green);">NT$ ${p.lt.toLocaleString()}</b></td>
+                    <td>${p.hasDrop ? `<b style="color:var(--accent-green);">省 NT$ ${p.dropAmt.toLocaleString()} (${(p.dropPct*100).toFixed(1)}%)</b>` : '-'}</td>
+                    <td><small style="color:var(--text-secondary);">${p.last_price_change_time || '-'}</small></td>
+                </tr>
+            `).join('');
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
